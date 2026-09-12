@@ -5,7 +5,7 @@
 | **Slug** | `plataforma-conversa-lead` |
 | **Date** | 2026-09-12 |
 | **WRS** | 100/100 |
-| **Revisão** | r9 — r8 recebeu FIX-FIRST (8 achados, 4 bloqueantes). Rate limit acoplado ao teto, que o r8 deixara maior que ele e portanto inalcançável; vazamento do numerador de *abertura do link* para `desconhecido` declarado e a assimetria de leitura corrigida; go/no-go ganhou evidência nomeada capaz de sustentar adoção **positiva**, sem a qual só era pré-registrável na direção do no-go; reconciliação do contador separada em teste de código e desigualdade em quiescência; população do baseline unificada numa regra só |
+| **Revisão** | r10 — r9 recebeu atualização pós-SDD: vocabulário expandido com Operador e Liderança; backoffice de 3 níveis adicionado ao Scope IN; configuração de campanhas (links com `?origem=`) adicionada; sistema de transferência com 3 gatilhos formalizado (mínimo fatia 1); 2 novos riscos (R7 adoção operacional, R8 complexidade de transferência); decisões #24–#27 adicionadas. WRS mantido em 100/100 — escopo expandido com justificativa de requisito presente. |
 
 ## Problem
 
@@ -39,10 +39,12 @@ qual a resolução de identidade é construída depois.
 
 | Termo | Significa |
 |-------|-----------|
-| **Tenant** | A empresa que contrata a plataforma (cliente pagante) |
-| **Lead** | A pessoa que conversa com o agente (cliente do tenant) |
-| **Agente** | O interlocutor automatizado da plataforma |
-| **Sessão** | Uma visita ao link, anônima até a identificação |
+| **Tenant** | A empresa que contrata a plataforma (cliente pagante). Na fatia 1, representa a camada de **Gestão da Empresa** — decisões estratégicas, go/no-go, compliance. |
+| **Liderança** | Gestor de equipe do tenant. Configura parâmetros operacionais, gerencia operadores, monitora métricas agregadas. |
+| **Operador** | Profissional do tenant que opera a plataforma no dia a dia: monitora sessões ativas, revisa saídas de leads, flaga escalas. |
+| **Lead** | A pessoa que conversa com o agente (cliente do tenant). Também referido como **Cliente Final** nas notas de workshop. |
+| **Agente** | O interlocutor automatizado da plataforma. |
+| **Sessão** | Uma visita ao link, anônima até a identificação. |
 
 ## Scope
 
@@ -164,6 +166,13 @@ qual a resolução de identidade é construída depois.
   custo escalar com o ataque. R10 exige só que a exclusão seja auditável, e um
   escalar ao lado do relatório basta.
 - Um tenant piloto, configurado à mão.
+- **Backoffice com 3 níveis de acesso** (Operador, Liderança, Gestão), autenticado por e-mail/senha com JWT. O backoffice é requisito presente: sem ele, o tenant piloto não tem como operar a plataforma — não existe usuário interno para monitorar sessões, revisar leads ou tomar decisões de go/no-go. Escopo mínimo por nível:
+  - **Operador:** dashboard de sessões ativas (auto-refresh 30s), revisão de leads com filtro/export CSV, flag de sessão para escala, notas internas. Read-only sobre métricas.
+  - **Liderança:** tudo do Operador + gestão de operadores (CRUD via invite por e-mail), configuração de parâmetros operacionais (TTL, rate limit, turn limit) com log de auditoria, dashboard de métricas agregadas (semanal/mensal).
+  - **Gestão:** tudo da Liderança + painel de evidência go/no-go, export de relatório de compliance LGPD.
+  - RBAC implementado como tabela de permissões por papel, não como roles hardcoded — adicionar um quarto papel não exige mudança de código.
+- **Configuração de campanhas como links rotulados.** Cada campanha é um registro `CampaignConfig` com nome, slug, e valor de `?origem=`. Gera URL completa com atribuição. Lista de campanhas com contadores agregados (sessões, leads, taxa de conversão). Estados: `active`, `paused`, `archived`. Escopo mínimo: criação, listagem, copy-link. Overrides por campanha (TTL, transferência) são **deferidos** — fatia 1 usa parâmetros do tenant para todas as campanhas.
+- **Configuração de transferência (mínimo fatia 1).** Schema `TransferConfig` com toggle master e modo `none` (fallback estático) ou `channel` (redirecionamento externo). Gatilho 1 ("Não há") implementado como fallback atual formalizado. Gatilhos 2 (operador decide) e 3 (cliente solicita) são **deferidos** — exigem handoff ao vivo (OUT) e NLU estendido. Contador escalar de transferências separado do bucket principal.
 
 ### OUT
 
@@ -178,9 +187,12 @@ qual a resolução de identidade é construída depois.
 - Verificação de posse do e-mail (código de confirmação, double opt-in).
 - **Detecção de bot** — fingerprinting, captcha ou serviço de terceiro. Rate
   limiting é o único mecanismo; ver Risco 9.
-- Admin do tenant e autosserviço.
-- Disparo de marketing e campanhas — consumidor da identidade, não produtor.
+- Admin do tenant **multi-tenant** e autosserviço. O backoffice de tenant único (fatia 1) está IN — ver Scope IN acima.
+- Disparo de marketing e campanhas — consumidor da identidade, não produtor. **A configuração de campanhas como links rotulados está IN** (ver Scope IN); o disparo em si permanece OUT.
 - Multi-tenant.
+- **Sistema de transferência completo** (fila de operadores, handoff ao vivo, presença). A configuração mínima (toggle + fallback) está IN; a execução completa permanece OUT.
+- **Overrides de parâmetros por campanha.** Fatia 1 usa parâmetros do tenant para todas as campanhas.
+- **Detecção NLU de solicitação de transferência pelo cliente.** Fatia 1 usa keyword matching simples se necessário; NLU estendido fica para fatia 2.
 - Integração de API com WhatsApp em qualquer direção.
 - Endereço, cadastro completo, qualquer formulário longo (restrição dura).
 - Costura de sessão anônima a lead via cookie ou device token.
@@ -256,7 +268,8 @@ pode congelar o comportamento do agente no primeiro turno.
 - **Simplest complete design:** landing por link → chat anônimo → classificador
   → handler de qualificação → pedido contextual de e-mail → lead durável.
   Um front, um backend, um banco, uma tabela de leads, uma tabela de sessão
-  efêmera, um bucket de contadores.
+  efêmera, um bucket de contadores, um backoffice de 3 níveis, uma tabela de
+  campanhas, um schema de transferência.
 
 - **Added machinery:**
   - *Classificador com quatro intenções, uma abstenção e um único handler.*
@@ -289,6 +302,16 @@ pode congelar o comportamento do agente no primeiro turno.
     fundamentada.** O que a sustenta é a competência do time, não uma
     necessidade técnica; o app único atenderia. Custo de dois deploys
     conscientemente aceito, e registrado como tal.
+  - *Backoffice de 3 níveis com RBAC por tabela.* Requisito presente: o tenant
+    piloto precisa de usuários internos para operar a plataforma. Sem backoffice,
+    não há quem monitore sessões, revise leads ou tome decisões de go/no-go.
+    RBAC por tabela (não hardcoded) permite adicionar papéis sem mudar código.
+  - *Configuração de campanhas como links rotulados.* Requisito presente:
+    `?origem=` já está no Scope IN; sem um registro que o gerencie, a atribuição
+    vira string solta sem governança. Motor de disparo permanece OUT.
+  - *Schema de transferência (configuração IN, execução OUT).* Requisito
+    presente para o gatilho 1 (fallback formalizado). Gatilhos 2 e 3 exigem
+    handoff ao vivo — OUT na fatia 1.
 
 - **Deferred until measured:**
 
@@ -364,6 +387,10 @@ pode congelar o comportamento do agente no primeiro turno.
 | 21 | Segmentação do piso só com célula mínima de 30; abaixo disso, agregado com rótulo de indicativa | O piso descritivo foi escrito como "livre de N" mas exigia engajamento e conversão segmentados por `origem` — 8 células. Com 40 sessões, são ~5 por célula. Rotular `origem × intencao` como indicativa em N=200 e não rotular 8 células em N=40 era incoerente. O mesmo princípio passa a valer nos dois lugares, com forma diferente: rótulo fixo no crosstab, limiar por célula no piso. O 30 é contado **no denominador da própria métrica**, que difere entre engajamento e conversão. Não é um número mágico — é o ponto a partir do qual uma proporção começa a ser lida sem constranger, e errar entre 25 e 30 custa um rótulo, não uma conclusão. |
 | 22 | "Inconclusivo" é desfecho legal e nomeado do go/no-go, e a regra pré-registrada é **qualitativa** | Um critério binário sem opção de não decidir força uma decisão sobre dado insuficiente. E não havia o que pré-registrar: "sem meta numérica, este é o baseline" contra "a decisão não pode ser formulada depois de ver o número" deixava o pré-registro vazio por construção. A regra pré-registrada passa a ser uma avaliação escrita com dois juízos separados — adoção e qualidade — mais a regra de composição entre eles; os números do piso entram como contexto, não como limiar. |
 | 23 | Fallback é terminal para o **turno**, não para a sessão; e o pedido de e-mail sai do handler de `qualificacao`, com condição e teto de exibições declarados | Fallback terminal para a sessão mataria uma qualificação em andamento, junto com o pedido de e-mail, porque o lead perguntou de agendamento no meio. Manter o pedido no handler mantém a contrapartida verdadeira: só prometemos retorno sobre a conversa quando existe conversa a retornar. E "momento contextual" não é testável, então a condição (intenção + urgência + fit capturados, ou turno 4) e o teto (duas exibições) são parte da decisão, não detalhe de implementação. |
+| 24 | **Backoffice de 3 níveis (Operador, Liderança, Gestão) em vez de "Tenant" monolítico.** RBAC por tabela de permissões, não roles hardcoded. | Requisito presente: o tenant piloto precisa de usuários internos para operar a plataforma. A diferenciação em 3 níveis reflete a estrutura operacional real identificada nas notas de workshop — um gestor não opera sessões, um operador não decide go/no-go. RBAC por tabela permite adicionar papéis sem mudar código (DRY). |
+| 25 | **Campanhas como links rotulados, não como sistema de marketing.** `CampaignConfig` é um registro de atribuição (`?origem=`), não um motor de disparo. | Requisito presente: o parâmetro `?origem=` já está no Scope IN; sem um registro que o gerencie, a atribuição vira string solta sem governança. O motor de disparo permanece OUT — campanhas aqui são *produtoras* de link, não *consumidoras* de identidade. |
+| 26 | **Transferência: configuração IN, execução OUT.** `TransferConfig` schema e gatilho 1 (fallback) implementados; gatilhos 2 e 3 deferidos. | Requisito presente para o gatilho 1 (já é o fallback atual, só precisa de formalização). Gatilhos 2 e 3 exigem handoff ao vivo e NLU estendido — ambos OUT na fatia 1. Separar configuração de execução mantém KISS: o schema existe, a complexidade de fila/presença não entra. |
+| 27 | **Contador de transferência separado do bucket principal.** Escalar próprio, não dimensão adicional. | Adicionar `transferido` como dimensão dobraria o bucket de 288 para 576. Na fatia 1, transferências são raras (piloto, modo `none` por padrão). Um escalar separado é suficiente para auditoria e não contamina a estrutura de contagem existente. |
 
 ## Risks & Assumptions
 
@@ -382,6 +409,8 @@ pode congelar o comportamento do agente no primeiro turno.
 | 10 | Excluir do N as sessões que estouram o teto remove justamente as mais engajadas. Na maior parte do baseline a direção do viés é desconhecida, mas **na conversão ela é conhecida**: o teto atinge preferencialmente quem ficou tempo suficiente para converter, então a conversão sai **subestimada**. | Low | A abertura do link já conta `excluida_teto` no numerador justamente por isso. Teto dimensionado a partir da conversa mais longa do histórico de WhatsApp do tenant — não da plataforma, onde ainda não há conversa nenhuma — e declarado provisório, revisto na semana 2. `sessao_valida = excluida_teto` contado separadamente de `excluida_rate_limit` (#16), e bloqueios de borda por IP num escalar fora do bucket, para que a exclusão seja auditável sem contaminar as contagens por sessão. |
 | 11 | **O subsistema mais caro do portfólio passa a ser governado por relato qualitativo.** Com `quer_humano` removido (#20), não existe sinal medido de demanda por atendente humano; o gatilho de handoff, áudio e vídeo depende do time comercial do tenant reportar o que ouve. | Medium | Limitação aceita e declarada, não mitigada — mesmo formato de R8 e R9. A alternativa medida foi avaliada e reprovou na própria aritmética do design: sob N baixo, um intervalo de ±11 a ±27pp e nenhuma cadência de agregação viável, ela produziria confiança falsa em vez de sinal. Um relato lossy que se sabe lossy erra de forma visível; uma taxa que não pode disparar erra de forma invisível. Se o tenant relatar demanda, a decisão de construir é tomada com a evidência que existe, sem fingir precisão. |
 | 12 | O corpus de rotulagem são mensagens reais de leads do tenant, reaproveitadas para uma finalidade nova. O tenant é controlador; nós seríamos operador. | Low | Autorização formal do tenant e despersonalização antes do uso. Se o tenant não autorizar, o critério "Classificador validado" admite corpus sintético com a limitação declarada no relatório, em vez de travar a fatia. |
+| 13 | **Adoção operacional: o tenant piloto pode não ter operadores dedicados.** Sem operadores, o backoffice fica subutilizado e métricas de eficiência operacional não são testáveis. | Medium | Mitigação: definir com o tenant piloto, antes do início, quantos operadores terão acesso e qual a rotina esperada. Se o tenant não alocar operadores, o backoffice é validado apenas como "funciona" — não como "é usado". A decisão go/no-go não depende de uso do backoffice, só de R1. |
+| 14 | **Complexidade de transferência sem handoff ao vivo pode criar expectativa não atendida.** O Cliente Final pode esperar ser transferido para um humano em tempo real, e o fallback estático (gatilho 1) não entrega isso. | Medium | Mitigação: a mensagem de fallback declara explicitamente que não há transferência ao vivo e oferece canal alternativo (telefone/e-mail). A expectativa é gerenciada na interface, não na infraestrutura. Se o piloto revelar demanda por transferência real, ela entra na fatia 2 com handoff ao vivo. |
 
 ## Success Criteria
 
@@ -396,6 +425,10 @@ pode congelar o comportamento do agente no primeiro turno.
 - [ ] **Dedup:** dois cadastros com o mesmo e-mail diferindo em caixa ou espaço resolvem para um único lead.
 - [ ] **Contadores:** a emissão terminal ocorre em toda sessão, inclusive nas abandonadas (via varredura de TTL), nas que nunca digitaram (`intencao = nenhuma`) e nas que digitaram sem produzir rótulo (`intencao = indefinida`), com as quatro dimensões preenchidas e `origem` caindo em `desconhecido` quando o parâmetro falta ou não é reconhecido. O que persiste é o contador agregado: nenhum identificador de sessão e nenhum timestamp por sessão. A relação `enviado_aceito` ⟺ lead durável vale **por sessão** e por isso **não** fecha por igualdade de contagem — verificá-la assim falharia sempre, por duas causas legítimas: dedup (duas sessões com o mesmo e-mail somam 2 e produzem 1 lead) e exclusões (uma sessão que converte e depois estoura o teto sai do N mas o lead permanece). A verificação são duas asserções direcionais mais uma desigualdade: nenhum lead existe sem uma sessão `enviado_aceito`; nenhuma sessão `enviado_aceito` deixou de fazer upsert; e `soma(enviado_aceito) ≥ leads distintos`, com a diferença explicada por dedup. A reconciliação varre **todos** os buckets, inclusive os excluídos.
 - [ ] **Rate limiting ativo:** uma sessão que existe e depois estoura o limite ou o teto registra `sessao_valida = excluida_rate_limit` ou `excluida_teto` conforme a causa, fica fora do N e das taxas, e as duas contagens são reportadas **separadamente** — abuso e leads engajados demais não podem ser somados. Requisição barrada na borda por IP **não** cria registro de sessão: é contada num escalar operacional por IP e por dia, reportado ao lado do bucket. A exclusão fica auditável (R10) sem que uma unidade de requisição entre num contador cuja unidade é sessão, e sem que o mecanismo de contenção de custo escale com o ataque.
+- [ ] **Backoffice funcional:** um Operador faz login, vê o dashboard de sessões ativas, revisa um lead identificado e exporta a lista em CSV. Uma Liderança faz login, cria um novo operador via invite por e-mail, e altera um parâmetro operacional (ex.: TTL) — a mudança é registrada no log de auditoria com timestamp, autor, valor anterior e posterior.
+- [ ] **RBAC efetivo:** um Operador **não** consegue acessar a tela de gestão de operadores nem alterar parâmetros. Uma Liderança **não** consegue acessar o painel de go/no-go nem exportar relatório de compliance. A verificação é por tentativa de acesso a endpoint protegido — resposta 403 esperada.
+- [ ] **Campanha criada e link gerado:** uma Liderança cria uma campanha com nome e origem, o sistema gera a URL completa com `?origem=`, e o link é copiável. Uma sessão iniciada por esse link é corretamente atribuída ao valor de `origem` da campanha no bucket de contadores.
+- [ ] **Transferência configurada (mínimo):** o schema `TransferConfig` existe e é consultado pelo fallback handler. Com modo `none`, o fallback exibe a mensagem configurada e o contato alternativo. O contador escalar de transferências é incrementado em cada fallback executado.
 
 ### Piso descritivo — obrigatório com qualquer N
 
@@ -442,6 +475,19 @@ Enquanto N < 200, nada nesta seção é reportável, e **todo gatilho numérico 
 ## Next Step
 
 After an independent design review returns SHIP, persist the evidence below and verify its content digest before running `wish`.
+
+### SDD Reference
+
+The following Spec-Driven Development documents were produced from workshop notes cross-referenced against this DESIGN.md. They expand the design with operational detail that the original slice did not address:
+
+| SDD Document | What it adds |
+|-------------|-------------|
+| `docs/sdd/01-actors-and-roles.md` | Actor taxonomy (3 backoffice + 1 external + 2 system), RBAC matrix, gap table |
+| `docs/sdd/02-user-stories.md` | 17 user stories across 4 actors + transfer, MoSCoW prioritized |
+| `docs/sdd/03-functional-spec-backoffice.md` | Auth/RBAC, 3 dashboards, API endpoints, audit logging |
+| `docs/sdd/04-transfer-workflow.md` | 3 transfer triggers, config schema, state machine, fatia 1 scope decision |
+| `docs/sdd/05-campaign-management.md` | CampaignConfig model, link attribution, lifecycle, Postgres schema |
+| `docs/sdd/06-gap-analysis.md` | Coverage matrix, 6 gaps, 4 ambiguities, 10 unstated requirements |
 
 <!-- genie-design-review:start -->
 ## Design Review Evidence
