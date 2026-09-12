@@ -26,10 +26,12 @@ identidade do lead é resolvida na porta de entrada.
 
 | Termo | Significa |
 |-------|-----------|
-| **Tenant** | A empresa que contrata a plataforma (nosso cliente pagante) |
-| **Lead** | A pessoa que conversa com o agente (cliente do tenant) |
-| **Agente** | O interlocutor automatizado da plataforma |
-| **Atendente** | O humano do tenant que assume a conversa ao vivo |
+| **Tenant** | A empresa que contrata a plataforma (nosso cliente pagante). Na fatia 1, representa a camada de **Gestão da Empresa**. |
+| **Liderança** | Gestor de equipe do tenant. Configura parâmetros operacionais, gerencia operadores, monitora métricas agregadas. |
+| **Operador** | Profissional do tenant que opera a plataforma no dia a dia: monitora sessões ativas, revisa saídas de leads, flaga escalas. |
+| **Lead** | A pessoa que conversa com o agente (cliente do tenant). Também referido como **Cliente Final** nas notas de workshop. |
+| **Agente** | O interlocutor automatizado da plataforma. |
+| **Sessão** | Uma visita ao link, anônima até a identificação. |
 
 ---
 
@@ -56,15 +58,19 @@ anônimo, venha do site, do Google ou do WhatsApp. Consequências:
 
 ### Abertas — bloqueando o refinamento
 
-- **D5 — Job-to-be-done do agente.** O que o agente efetivamente faz na
-  conversa. Sem isso não existe critério de aceite testável.
-- **D6 — Momento e contrapartida da identificação.** Quando pedimos o
-  e-mail e o que o lead ganha em troca.
-- **D7 — Stack.** Repositório vazio, nada decidido.
+- ~~**D5 — Job-to-be-done do agente.**~~ ✅ Fechada: classificador de intenção + handler de qualificação + fallback.
+- ~~**D6 — Momento e contrapartida da identificação.**~~ ✅ Fechada: pedido contextual no meio da conversa, métrica vira taxa por sessão.
+- ~~**D7 — Stack.**~~ ✅ Fechada: Next.js + FastAPI + Postgres.
+
+### Novas — surgidas da revisão SDD (r10)
+
+- **D24 — Escopo do backoffice.** 3 níveis definidos (Operador, Liderança, Gestão) com RBAC por tabela. ✅ Fechada na r10.
+- **D25 — Configuração de campanhas.** CampaignConfig como links rotulados com `?origem=`. Overrides por campanha deferidos. ✅ Fechada na r10.
+- **D26 — Sistema de transferência.** Schema TransferConfig com 3 gatilhos. Gatilho 1 IN; gatilhos 2 e 3 deferidos (exigem handoff ao vivo). ✅ Fechada na r10.
 
 ---
 
-## Scope (parcial — depende de D5)
+## Scope (atualizado — r10)
 
 ### IN — fatia 1
 
@@ -73,6 +79,9 @@ anônimo, venha do site, do Google ou do WhatsApp. Consequências:
 - Conversa com o agente.
 - Registro do lead identificado, deduplicado por e-mail.
 - Um tenant piloto.
+- **Backoffice de 3 níveis** (Operador, Liderança, Gestão) com RBAC por tabela.
+- **Configuração de campanhas** como links rotulados (CampaignConfig).
+- **Configuração de transferência** (mínimo: schema + gatilho 1 fallback).
 
 ### OUT — sub-projetos posteriores
 
@@ -81,9 +90,11 @@ anônimo, venha do site, do Google ou do WhatsApp. Consequências:
 | 2 | Carrossel e botões interativos | Diferencial, não premissa. Entra depois que R1 for provado. |
 | 3 | Handoff ao vivo + presença ("bolinha") | Subsistema próprio, exige disponibilidade humana. |
 | 4 | Áudio e vídeo no modal | O mais caro de todos (infra de mídia). |
-| 5 | Admin do tenant / autosserviço | Um tenant piloto é configurado à mão. |
-| 6 | Disparo de marketing / campanhas | É o *consumidor* da identidade, não produtor. Traz LGPD junto (R5). |
+| 5 | Admin do tenant **multi-tenant** / autosserviço | Backoffice de tenant único está IN. Autosserviço e multi-tenant ficam fora. |
+| 6 | Disparo de marketing / campanhas | Configuração de campanhas está IN. Disparo em si permanece OUT. |
 | 7 | Multi-tenant | Ver D2. |
+| 8 | Transferência completa (fila, handoff, NLU) | Configuração mínima IN. Execução exige handoff ao vivo — OUT. |
+| 9 | Overrides de parâmetros por campanha | Fatia 1 usa parâmetros do tenant para todas as campanhas. |
 
 Explicitamente fora, por restrição do usuário: endereço, cadastro completo,
 qualquer formulário longo.
@@ -108,12 +119,18 @@ qualquer formulário longo.
   disparo fora de escopo.
 - **R6 — Assumido, não confirmado:** o tenant piloto existe e está disposto
   a mandar tráfego real. Sem tráfego real, R1 não é testável.
+- **R13 — Adoção operacional:** o tenant piloto pode não ter operadores
+  dedicados, tornando o backoffice subutilizado. Mitigação: definir com o
+  tenant, antes do início, quantos operadores terão acesso.
+- **R14 — Transferência sem handoff ao vivo pode criar expectativa não
+  atendida.** O Cliente Final pode esperar transferência em tempo real.
+  Mitigação: fallback declara explicitamente que não há transferência ao vivo.
 
 ---
 
 ## Criteria
 
-Nenhum critério testável ainda — depende de D5.
+Critérios de sucesso definidos em DESIGN.md (r10). Ver seção "Success Criteria" — inclui critérios para fluxo completo, fallback isolado, abstenção roteada, classificador validado, validação de e-mail, dedup, contadores, rate limiting, backoffice/RBAC, campanhas e transferência.
 
 ---
 
@@ -168,3 +185,13 @@ evidência.
   Correções que encolheram escopo: detecção de bot removida, consentimento
   virou porta de envio, finalidade estreitada à fatia 1. Evidência SHIP
   carimbada e verificada. Wish bloqueado até R2 ser confirmado.
+- **2026-09-12** — Revisão SDD pós-workshop. Notas manuscritas do workshop
+  (atores/papéis + transferência + campanhas) cruzadas com DESIGN.md.
+  6 gaps identificados (2 HIGH: Operador e Liderança ausentes; 3 MEDIUM:
+  transferência, campanhas, diferenciação de Tenant; 1 LOW: fallback
+  não formalizado). 4 ambiguidades resolvidas. 10 requisitos não declarados
+  surfaced. DESIGN.md atualizado para r10: vocabulário expandido, backoffice
+  de 3 níveis adicionado ao Scope IN, configuração de campanhas e transferência
+  formalizadas, decisões #24–#27, riscos #13–#14, critérios de sucesso para
+  backoffice/RBAC/campanhas/transferência. SDD documents gerados em
+  `docs/sdd/01` a `docs/sdd/06`. WRS mantido em 100/100.
