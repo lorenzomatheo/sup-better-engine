@@ -1,4 +1,3 @@
-#Requires -Version 7.0
 <#
 .SYNOPSIS
     Sup Better Engine — Start all services (backend + frontend).
@@ -40,20 +39,17 @@ param(
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-function Write-Status($icon, $msg, $color = "White") {
-    Write-Host "$icon $msg" -ForegroundColor $color
-}
-function Write-Ok($msg)   { Write-Status "✅" $msg "Green" }
-function Write-Info($msg) { Write-Status "ℹ️" $msg "Cyan" }
-function Write-Err($msg)  { Write-Status "❌" $msg "Red" }
+function Write-Ok($msg)   { Write-Host "[OK]   $msg" -ForegroundColor Green }
+function Write-Info($msg) { Write-Host "[INFO] $msg" -ForegroundColor Cyan }
+function Write-Err($msg)  { Write-Host "[ERR]  $msg" -ForegroundColor Red }
 
 Write-Host ""
-Write-Host "╔═══════════════════════════════════════════════╗" -ForegroundColor Magenta
-Write-Host "║     Sup Better Engine — Full Stack Start     ║" -ForegroundColor Magenta
-Write-Host "╚═══════════════════════════════════════════════╝" -ForegroundColor Magenta
+Write-Host "=====================================================" -ForegroundColor Magenta
+Write-Host "     Sup Better Engine - Full Stack Start" -ForegroundColor Magenta
+Write-Host "=====================================================" -ForegroundColor Magenta
 Write-Host ""
 
-# ── Backend ──────────────────────────────────────────────────────────────────
+# -- Backend ------------------------------------------------------------------
 
 if (-not $FrontendOnly) {
     Write-Info "Starting backend..."
@@ -70,7 +66,7 @@ if (-not $FrontendOnly) {
     Write-Host ""
 }
 
-# ── Frontend ─────────────────────────────────────────────────────────────────
+# -- Frontend -----------------------------------------------------------------
 
 if (-not $BackendOnly) {
     Write-Info "Starting frontend..."
@@ -87,17 +83,17 @@ if (-not $BackendOnly) {
 }
 
 Write-Host ""
-Write-Host "╔═══════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║          All services are running!           ║" -ForegroundColor Green
-Write-Host "╠═══════════════════════════════════════════════╣" -ForegroundColor Green
-Write-Host "║  Backend:  http://localhost:8000             ║" -ForegroundColor Cyan
-Write-Host "║  Frontend: http://localhost:3000             ║" -ForegroundColor Cyan
-Write-Host "║  Docs:     http://localhost:8000/docs        ║" -ForegroundColor Cyan
-Write-Host "╚═══════════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "=====================================================" -ForegroundColor Green
+Write-Host "          All services are running!" -ForegroundColor Green
+Write-Host "-----------------------------------------------------" -ForegroundColor Green
+Write-Host "  Backend:  http://localhost:8000" -ForegroundColor Cyan
+Write-Host "  Frontend: http://localhost:3000" -ForegroundColor Cyan
+Write-Host "  Docs:     http://localhost:8000/docs" -ForegroundColor Cyan
+Write-Host "=====================================================" -ForegroundColor Green
 Write-Host ""
 Write-Info "Press Ctrl+C to stop all services."
 
-# ── Wait for Ctrl+C ──────────────────────────────────────────────────────────
+# -- Wait for Ctrl+C ----------------------------------------------------------
 
 try {
     while ($true) { Start-Sleep -Seconds 5 }

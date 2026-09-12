@@ -1,4 +1,3 @@
-#Requires -Version 7.0
 <#
 .SYNOPSIS
     Sup Better Engine — Frontend startup script (Windows PowerShell).
@@ -15,22 +14,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$FrontendDir = $ScriptDir
+$FrontendDir = Join-Path (Split-Path -Parent $ScriptDir) "frontend"
 $LogFile = Join-Path $FrontendDir "logs\frontend-startup.log"
 $PidFile = Join-Path $FrontendDir ".frontend.pid"
 $FrontendPort = 3000
 $BackendPort = 8000
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# -- Helpers ------------------------------------------------------------------
 
-function Write-Status($icon, $msg, $color = "White") {
-    Write-Host "$icon $msg" -ForegroundColor $color
-}
-
-function Write-Ok($msg)   { Write-Status "✅" $msg "Green" }
-function Write-Warn($msg) { Write-Status "⚠️" $msg "Yellow" }
-function Write-Err($msg)  { Write-Status "❌" $msg "Red" }
-function Write-Info($msg) { Write-Status "ℹ️" $msg "Cyan" }
+function Write-Ok($msg)   { Write-Host "[OK]   $msg" -ForegroundColor Green }
+function Write-Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
+function Write-Err($msg)  { Write-Host "[ERR]  $msg" -ForegroundColor Red }
+function Write-Info($msg) { Write-Host "[INFO] $msg" -ForegroundColor Cyan }
 
 function Ensure-Dir($path) {
     if (-not (Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }
@@ -57,7 +52,7 @@ function Kill-PortProcess($port) {
             Stop-Process -Id $pid -Force -ErrorAction Stop
             Write-Ok "Killed PID $pid"
         } catch {
-            Write-Err "Cannot kill PID $pid — $_"
+            Write-Err "Cannot kill PID $pid - $_"
             return $false
         }
     }
@@ -65,10 +60,10 @@ function Kill-PortProcess($port) {
     return $true
 }
 
-# ── Graceful shutdown trap ───────────────────────────────────────────────────
+# -- Graceful shutdown trap ---------------------------------------------------
 
 trap {
-    Write-Warn "Interrupted — cleaning up..."
+    Write-Warn "Interrupted - cleaning up..."
     if (Test-Path $PidFile) {
         $pid = Get-Content $PidFile -Raw
         Stop-Process -Id ([int]$pid.Trim()) -Force -ErrorAction SilentlyContinue
@@ -78,15 +73,15 @@ trap {
     exit 0
 }
 
-# ── 0. Restart mode ─────────────────────────────────────────────────────────
+# -- 0. Restart mode ----------------------------------------------------------
 
 if ($Restart) {
-    Write-Info "Restart mode — stopping existing frontend..."
+    Write-Info "Restart mode - stopping existing frontend..."
     Kill-PortProcess $FrontendPort | Out-Null
     if (Test-Path $PidFile) { Remove-Item $PidFile -Force }
 }
 
-# ── 1. Backend dependency check ────────────────────────────────────────────
+# -- 1. Backend dependency check ----------------------------------------------
 
 Write-Info "Checking backend health..."
 Log "=== Frontend startup begin ==="
@@ -108,10 +103,10 @@ if (-not $SkipBackendCheck) {
         exit 1
     }
 } else {
-    Write-Info "Skipping backend check (--SkipBackendCheck)"
+    Write-Info "Skipping backend check (-SkipBackendCheck)"
 }
 
-# ── 2. Node.js check ───────────────────────────────────────────────────────
+# -- 2. Node.js check ---------------------------------------------------------
 
 $nodeVersion = node --version 2>&1
 if ($LASTEXITCODE -ne 0) {
@@ -120,11 +115,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Ok "Node.js $nodeVersion"
 
-# ── 3. Node dependencies ───────────────────────────────────────────────────
+# -- 3. Node dependencies -----------------------------------------------------
 
 $nodeModules = Join-Path $FrontendDir "node_modules"
 if (-not (Test-Path $nodeModules)) {
-    Write-Info "node_modules not found — running npm install..."
+    Write-Info "node_modules not found - running npm install..."
     Push-Location $FrontendDir
     npm install 2>&1 | ForEach-Object { Log "npm: $_" }
     if ($LASTEXITCODE -ne 0) {
@@ -140,10 +135,10 @@ if (-not (Test-Path $nodeModules)) {
 }
 Log "Dependencies OK"
 
-# ── 4. Optional build check ────────────────────────────────────────────────
+# -- 4. Optional build check --------------------------------------------------
 
 if ($SkipBuildCheck) {
-    Write-Info "Skipping build check (--SkipBuildCheck)"
+    Write-Info "Skipping build check (-SkipBuildCheck)"
 } else {
     Write-Info "Running quick TypeScript type check..."
     Push-Location $FrontendDir
@@ -159,7 +154,7 @@ if ($SkipBuildCheck) {
     Pop-Location
 }
 
-# ── 5. Port management ─────────────────────────────────────────────────────
+# -- 5. Port management -------------------------------------------------------
 
 $existing = Get-PortProcess $FrontendPort
 if ($existing) {
@@ -171,13 +166,15 @@ if ($existing) {
     }
 }
 
-# ── 6. Start Next.js dev server ────────────────────────────────────────────
+# -- 6. Start Next.js dev server ----------------------------------------------
 
 Write-Info "Starting Next.js dev server on port $FrontendPort..."
 Log "Starting next dev..."
 
-$nextProcess = Start-Process -FilePath "node" `
-    -ArgumentList "node_modules\next\dist\bin\next", "dev", "--port", $FrontendPort `
+Ensure-Dir (Join-Path $FrontendDir "logs")
+
+$nextProcess = Start-Process -FilePath "npx" `
+    -ArgumentList "next", "dev", "--port", $FrontendPort `
     -WorkingDirectory $FrontendDir `
     -PassThru `
     -RedirectStandardOutput (Join-Path $FrontendDir "logs\next-stdout.log") `
@@ -189,7 +186,7 @@ Ensure-Dir (Split-Path -Parent $PidFile)
 $nextProcess.Id | Out-File -FilePath $PidFile -Force
 Log "Next.js PID: $($nextProcess.Id)"
 
-# ── 7. Wait for ready ──────────────────────────────────────────────────────
+# -- 7. Wait for ready --------------------------------------------------------
 
 Write-Info "Waiting for frontend to become ready..."
 $frontendUrl = "http://localhost:$FrontendPort"
@@ -213,9 +210,9 @@ if ($ready) {
 }
 
 Write-Host ""
-Write-Host "═══════════════════════════════════════════════" -ForegroundColor Green
-Write-Host "  ✅  Frontend running — PID $($nextProcess.Id)" -ForegroundColor Green
-Write-Host "  🌐  Chat:      $frontendUrl" -ForegroundColor Cyan
-Write-Host "  🔧  Backoffice: ${frontendUrl}/backoffice" -ForegroundColor Cyan
-Write-Host "═══════════════════════════════════════════════" -ForegroundColor Green
+Write-Host "==================================================" -ForegroundColor Green
+Write-Host "  [OK] Frontend running - PID $($nextProcess.Id)" -ForegroundColor Green
+Write-Host "  [WEB]   $frontendUrl" -ForegroundColor Cyan
+Write-Host "  [ADMIN] ${frontendUrl}/backoffice" -ForegroundColor Cyan
+Write-Host "==================================================" -ForegroundColor Green
 Write-Host ""

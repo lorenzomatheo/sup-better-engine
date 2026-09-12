@@ -1,4 +1,3 @@
-#Requires -Version 7.0
 <#
 .SYNOPSIS
     Sup Better Engine — Stop all services cleanly.
@@ -19,12 +18,8 @@ $FrontendPidFile = Join-Path $FrontendDir ".frontend.pid"
 $BackendPort = 8000
 $FrontendPort = 3000
 
-function Write-Status($icon, $msg, $color = "White") {
-    Write-Host "$icon $msg" -ForegroundColor $color
-}
-function Write-Ok($msg)   { Write-Status "✅" $msg "Green" }
-function Write-Warn($msg) { Write-Status "⚠️" $msg "Yellow" }
-function Write-Info($msg) { Write-Status "ℹ️" $msg "Cyan" }
+function Write-Ok($msg)   { Write-Host "[OK]   $msg" -ForegroundColor Green }
+function Write-Info($msg) { Write-Host "[INFO] $msg" -ForegroundColor Cyan }
 
 Write-Host ""
 Write-Info "Stopping Sup Better Engine services..."
@@ -32,7 +27,7 @@ Write-Host ""
 
 $stopped = 0
 
-# ── Stop backend ─────────────────────────────────────────────────────────────
+# -- Stop backend -------------------------------------------------------------
 
 Write-Info "Stopping backend (port $BackendPort)..."
 
@@ -60,7 +55,7 @@ foreach ($p in $pids) {
 
 if ($stopped -eq 0) { Write-Info "Backend was not running." }
 
-# ── Stop frontend ────────────────────────────────────────────────────────────
+# -- Stop frontend ------------------------------------------------------------
 
 $feStopped = 0
 Write-Info "Stopping frontend (port $FrontendPort)..."

@@ -1,4 +1,3 @@
-#Requires -Version 7.0
 <#
 .SYNOPSIS
     Sup Better Engine — Backend startup script (Windows PowerShell).
@@ -16,22 +15,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$BackendDir = $ScriptDir
+$BackendDir = Join-Path (Split-Path -Parent $ScriptDir) "backend"
 $LogFile = Join-Path $BackendDir "logs\backend-startup.log"
 $PidFile = Join-Path $BackendDir ".backend.pid"
 $BackendPort = 8000
 $BackendHost = "0.0.0.0"
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# -- Helpers ------------------------------------------------------------------
 
-function Write-Status($icon, $msg, $color = "White") {
-    Write-Host "$icon $msg" -ForegroundColor $color
-}
-
-function Write-Ok($msg)   { Write-Status "✅" $msg "Green" }
-function Write-Warn($msg) { Write-Status "⚠️" $msg "Yellow" }
-function Write-Err($msg)  { Write-Status "❌" $msg "Red" }
-function Write-Info($msg) { Write-Status "ℹ️" $msg "Cyan" }
+function Write-Ok($msg)   { Write-Host "[OK]   $msg" -ForegroundColor Green }
+function Write-Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
+function Write-Err($msg)  { Write-Host "[ERR]  $msg" -ForegroundColor Red }
+function Write-Info($msg) { Write-Host "[INFO] $msg" -ForegroundColor Cyan }
 
 function Ensure-Dir($path) {
     if (-not (Test-Path $path)) { New-Item -ItemType Directory -Force -Path $path | Out-Null }
@@ -58,7 +53,7 @@ function Kill-PortProcess($port) {
             Stop-Process -Id $pid -Force -ErrorAction Stop
             Write-Ok "Killed PID $pid"
         } catch {
-            Write-Err "Cannot kill PID $pid — $_"
+            Write-Err "Cannot kill PID $pid - $_"
             return $false
         }
     }
@@ -77,26 +72,26 @@ function Test-BackendHealthy($url, $maxRetries = 15, $delaySec = 1) {
     return $false
 }
 
-# ── Graceful shutdown trap ───────────────────────────────────────────────────
+# -- Graceful shutdown trap ---------------------------------------------------
 
 $uvicornJob = $null
 trap {
-    Write-Warn "Interrupted — cleaning up..."
+    Write-Warn "Interrupted - cleaning up..."
     if ($uvicornJob) { Stop-Process -Id $uvicornJob.Id -Force -ErrorAction SilentlyContinue }
     if (Test-Path $PidFile) { Remove-Item $PidFile -Force }
     Write-Ok "Backend stopped."
     exit 0
 }
 
-# ── 0. Restart mode ─────────────────────────────────────────────────────────
+# -- 0. Restart mode ----------------------------------------------------------
 
 if ($Restart) {
-    Write-Info "Restart mode — stopping existing backend..."
+    Write-Info "Restart mode - stopping existing backend..."
     Kill-PortProcess $BackendPort | Out-Null
     if (Test-Path $PidFile) { Remove-Item $PidFile -Force }
 }
 
-# ── 1. Environment validation ───────────────────────────────────────────────
+# -- 1. Environment validation ------------------------------------------------
 
 Write-Info "Validating environment..."
 Log "=== Backend startup begin ==="
@@ -106,7 +101,7 @@ if (-not (Test-Path $envFile)) {
     $example = Join-Path (Split-Path -Parent $BackendDir) ".env.example"
     if (Test-Path $example) {
         Copy-Item $example $envFile
-        Write-Warn "No .env found — copied from .env.example. Review values!"
+        Write-Warn "No .env found - copied from .env.example. Review values!"
     } else {
         Write-Err "No .env file and no .env.example found. Create backend/.env manually."
         exit 1
@@ -132,10 +127,10 @@ if ($missingCritical.Count -gt 0) {
 
 # Warn about placeholder values
 if ($envContent -match 'SECRET_KEY=.*change-me') {
-    Write-Warn "SECRET_KEY is still a placeholder — fine for dev, change for production."
+    Write-Warn "SECRET_KEY is still a placeholder - fine for dev, change for production."
 }
 if ($envContent -match 'OPENAI_API_KEY=sk-placeholder') {
-    Write-Warn "OPENAI_API_KEY is placeholder — classifier will use stub mode."
+    Write-Warn "OPENAI_API_KEY is placeholder - classifier will use stub mode."
 }
 
 # Load .env into process environment
@@ -150,13 +145,13 @@ foreach ($line in (Get-Content $envFile)) {
 Write-Ok "Environment validated"
 Log "Environment OK"
 
-# ── 2. Python venv ──────────────────────────────────────────────────────────
+# -- 2. Python venv -----------------------------------------------------------
 
 $venvDir = Join-Path $BackendDir ".venv"
 $venvPython = Join-Path $venvDir "Scripts\python.exe"
 
 if (-not (Test-Path $venvPython)) {
-    Write-Info "Virtual environment not found — creating .venv..."
+    Write-Info "Virtual environment not found - creating .venv..."
     python -m venv $venvDir
     if ($LASTEXITCODE -ne 0) {
         Write-Err "Failed to create venv. Ensure Python 3.12+ is installed and on PATH."
@@ -167,7 +162,7 @@ if (-not (Test-Path $venvPython)) {
     Write-Ok "Virtual environment found"
 }
 
-# ── 3. Install/upgrade dependencies ────────────────────────────────────────
+# -- 3. Install/upgrade dependencies ------------------------------------------
 
 Write-Info "Installing/upgrading dependencies from pyproject.toml..."
 & $venvPython -m pip install --upgrade pip --quiet 2>&1 | Out-Null
@@ -180,7 +175,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Ok "Dependencies installed"
 Log "Dependencies OK"
 
-# ── 4. Database migrations ─────────────────────────────────────────────────
+# -- 4. Database migrations ---------------------------------------------------
 
 if (-not $SkipMigrations) {
     Write-Info "Running Alembic migrations..."
@@ -192,7 +187,6 @@ if (-not $SkipMigrations) {
             Write-Warn "Alembic migration failed (database may not exist yet)."
             Write-Warn "Create the database first: CREATE DATABASE sup_better_engine;"
             Log "Alembic FAILED"
-            # Don't exit — seed script creates tables as fallback
         } else {
             Write-Ok "Migrations up to date"
         }
@@ -200,10 +194,10 @@ if (-not $SkipMigrations) {
         Pop-Location
     }
 } else {
-    Write-Info "Skipping migrations (--SkipMigrations)"
+    Write-Info "Skipping migrations (-SkipMigrations)"
 }
 
-# ── 5. Seed data ───────────────────────────────────────────────────────────
+# -- 5. Seed data -------------------------------------------------------------
 
 if (-not $SkipSeed) {
     Write-Info "Running seed script..."
@@ -222,10 +216,10 @@ if (-not $SkipSeed) {
         Pop-Location
     }
 } else {
-    Write-Info "Skipping seed (--SkipSeed)"
+    Write-Info "Skipping seed (-SkipSeed)"
 }
 
-# ── 6. Port management ─────────────────────────────────────────────────────
+# -- 6. Port management -------------------------------------------------------
 
 $existing = Get-PortProcess $BackendPort
 if ($existing) {
@@ -237,12 +231,14 @@ if ($existing) {
     }
 }
 
-# ── 7. Start FastAPI server ────────────────────────────────────────────────
+# -- 7. Start FastAPI server --------------------------------------------------
 
 Write-Info "Starting FastAPI on ${BackendHost}:${BackendPort}..."
 Log "Starting uvicorn..."
 
 $env:PYTHONIOENCODING = "utf-8"
+
+Ensure-Dir (Join-Path $BackendDir "logs")
 
 $uvicornProcess = Start-Process -FilePath $venvPython `
     -ArgumentList "-m", "uvicorn", "app.main:app", "--reload", "--host", $BackendHost, "--port", $BackendPort `
@@ -257,7 +253,7 @@ Ensure-Dir (Split-Path -Parent $PidFile)
 $uvicornProcess.Id | Out-File -FilePath $PidFile -Force
 Log "Uvicorn PID: $($uvicornProcess.Id)"
 
-# ── 8. Health check ────────────────────────────────────────────────────────
+# -- 8. Health check ----------------------------------------------------------
 
 Write-Info "Waiting for backend to become healthy..."
 $backendUrl = "http://localhost:$BackendPort"
@@ -274,10 +270,10 @@ if (Test-BackendHealthy $backendUrl) {
 }
 
 Write-Host ""
-Write-Host "═══════════════════════════════════════════════" -ForegroundColor Green
-Write-Host "  ✅  Backend running — PID $($uvicornProcess.Id)" -ForegroundColor Green
-Write-Host "  📡  API:     $backendUrl" -ForegroundColor Cyan
-Write-Host "  📖  Docs:    ${backendUrl}/docs" -ForegroundColor Cyan
-Write-Host "  💚  Health:  ${backendUrl}/health" -ForegroundColor Cyan
-Write-Host "═══════════════════════════════════════════════" -ForegroundColor Green
+Write-Host "==================================================" -ForegroundColor Green
+Write-Host "  [OK] Backend running - PID $($uvicornProcess.Id)" -ForegroundColor Green
+Write-Host "  [API]  $backendUrl" -ForegroundColor Cyan
+Write-Host "  [DOCS] ${backendUrl}/docs" -ForegroundColor Cyan
+Write-Host "  [HEALTH] ${backendUrl}/health" -ForegroundColor Cyan
+Write-Host "==================================================" -ForegroundColor Green
 Write-Host ""
