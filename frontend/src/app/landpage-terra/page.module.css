@@ -1,0 +1,103 @@
+.terra {
+  --terra-ink: #10211d;
+}
+
+.heroOrb {
+  position: absolute;
+  right: -12rem;
+  top: -18rem;
+  width: 45rem;
+  height: 45rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 38% 65%, rgba(200, 255, 77, 0.36), rgba(68, 148, 83, 0.17) 32%, transparent 68%);
+  filter: blur(2px);
+}
+
+.heroGlow {
+  position: absolute;
+  bottom: -14rem;
+  left: -12rem;
+  width: 37rem;
+  height: 37rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(98, 176, 136, 0.17), transparent 67%);
+}
+
+.heroGrid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.28;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+}
+
+.floatSlow {
+  animation: terra-float 6s ease-in-out infinite;
+}
+
+.floatFast {
+  animation: terra-float 4.8s ease-in-out -1.8s infinite;
+}
+
+.orangeSun {
+  position: absolute;
+  width: 46rem;
+  height: 46rem;
+  right: -21rem;
+  top: -27rem;
+  border-radius: 9999px;
+  background: #f7ecbf;
+  opacity: 0.7;
+}
+
+.calculatorRange {
+  width: 100%;
+  height: 0.45rem;
+  appearance: none;
+  cursor: pointer;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #8fbc63, #c8ff4d);
+}
+
+.calculatorRange::-webkit-slider-thumb {
+  width: 1.25rem;
+  height: 1.25rem;
+  appearance: none;
+  border: 3px solid #10211d;
+  border-radius: 9999px;
+  background: #f7f5eb;
+  box-shadow: 0 2px 8px rgb(16 33 29 / 20%);
+}
+
+.calculatorRange::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border: 3px solid #10211d;
+  border-radius: 9999px;
+  background: #f7f5eb;
+  box-shadow: 0 2px 8px rgb(16 33 29 / 20%);
+}
+
+.calculatorRange:focus-visible {
+  outline: 2px solid #315c36;
+  outline-offset: 4px;
+}
+
+@keyframes terra-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floatSlow,
+  .floatFast {
+    animation: none;
+  }
+}
