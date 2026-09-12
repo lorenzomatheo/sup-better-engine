@@ -5,3 +5,14 @@
 Thumbs.db
 .idea/
 .vscode/
+node_modules/
+dist/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+data/
+playwright-report/
+test-results/
+*.tsbuildinfo
+!.env.production.example
