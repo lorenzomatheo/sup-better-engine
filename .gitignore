@@ -5,3 +5,41 @@
 Thumbs.db
 .idea/
 .vscode/
+
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+*.pyo
+backend/dist/
+backend/*.egg-info/
+
+# Node
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Build
+backend/build/
+dist/
+
+# IDE
+*.swp
+*.swo
+*~
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+
+# Logs
+*.log
+logs/
+
+# PID files from startup scripts
+*.pid
+backend/.backend.pid
+frontend/.frontend.pid

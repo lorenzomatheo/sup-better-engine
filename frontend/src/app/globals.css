@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+/* ===================================================================
+ * Design System Tokens — Sup Better Engine
+ * Source: docs/DESIGN-SYSTEM.md §2
+ * =================================================================== */
+
+:root {
+  /* === Identidade Sup Better === */
+  --sb-primary: 220 72% 56%;                /* #3B6FE8 — azul confiante */
+  --sb-primary-foreground: 0 0% 100%;
+  --sb-primary-hover: 220 72% 48%;
+  --sb-accent: 152 56% 46%;                 /* #2EAD6A — verde sucesso/lead */
+  --sb-accent-foreground: 0 0% 100%;
+
+  /* === Superfícies === */
+  --sb-canvas-chat: #f7f7f5;               /* fundo quente do chat (desktop) */
+  --sb-canvas-backoffice: 220 14% 96%;     /* fundo neutro frio do backoffice */
+  --sb-canvas-mobile: 220 14% 96%;
+
+  /* === Texto === */
+  --sb-fg: 220 12% 16%;
+  --sb-fg-strong: 0 0% 9%;                 /* neutral-900 */
+  --sb-muted: 220 10% 50%;
+  --sb-muted-foreground: 220 10% 60%;
+
+  /* === Bordas === */
+  --sb-border: 220 16% 88%;
+  --sb-border-desktop: rgba(229, 229, 229, 0.8);
+
+  /* === Cards === */
+  --sb-card: 0 0% 100%;
+  --sb-bubble-user: 220 72% 56%;           /* primary */
+  --sb-bubble-assistant: 0 0% 96%;         /* neutral-100 */
+  --sb-consent-bg: 220 72% 96%;            /* primary/5 */
+  --sb-consent-border: 220 72% 70%;        /* primary/30 */
+
+  /* === Status === */
+  --sb-success: 152 56% 46%;
+  --sb-warning: 38 92% 50%;
+  --sb-danger: 0 72% 51%;
+  --sb-info: 200 80% 50%;
+
+  /* === Raio === */
+  --sb-radius-xl: 12px;
+  --sb-radius-2xl: 16px;
+  --sb-radius-composer: 28px;
+  --sb-radius-hero: 32px;
+  --sb-radius-pill: 9999px;
+
+  /* === Misc === */
+  --sb-touch: 44px;
+  --sb-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sb-font-serif: ui-serif, Georgia, Cambodia, "Times New Roman", Times, serif;
+}
+
+/* ===================================================================
+ * Base styles
+ * =================================================================== */
+
+body {
+  font-family: var(--sb-font-sans);
+  color: hsl(var(--sb-fg));
+  background: hsl(var(--sb-canvas-backoffice));
+}
+
+/* Scrollbar refinement */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--sb-border));
+  border-radius: 3px;
+}
+
+/* Focus-visible global reset */
+*:focus-visible {
+  outline: 2px solid hsl(var(--sb-primary) / 0.4);
+  outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
